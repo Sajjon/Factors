@@ -2,11 +2,15 @@ import XCTest
 @testable import Factor
 
 final class FactorTests: XCTestCase {
-    func testExample() throws {
-        // XCTest Documentation
-        // https://developer.apple.com/documentation/xctest
-
-        // Defining Test Cases and Test Methods
-        // https://developer.apple.com/documentation/xctest/defining_test_cases_and_test_methods
+	
+	
+	func test_lazy_user() throws {
+		let entities = [
+			
+		]
+		let context = SigningContext(
+			entities: <#T##[SigningContext.SigningEntity]#>,
+			allFactorSources: <#T##[FactorSource]#>
+		)
     }
 }

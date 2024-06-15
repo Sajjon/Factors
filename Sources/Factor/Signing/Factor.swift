@@ -2,19 +2,17 @@ import Foundation
 import Collections
 import IdentifiedCollections
 
-
-// MARK: -
-// MARK: CONTEXT
-// MARK: -
 public class Context: BaseSigningProcess {
 	
+	/// Builders of signatures
 	private var signaturesOfEntities: IdentifiedArrayOf<SignaturesOfEntity>
 	
-	/// Can be plural, e.g. I'm a own account `A` and `B` and I'm signing a transaction where I spend
+	/// Can be plural, e.g. if Alice owns account `A` and `B` and Alice signs a transaction where she spend
 	/// funds from accounts `A` **and** `B` where both `A` and `B` is controlled by factor source `X`,
 	/// then this dictionary will have the entry `[X: [A, B]]`.
 	private let ownersOfFactor: Dictionary<FactorSourceID, Set<SignaturesOfEntity.ID>>
 	
+	/// Ordered and sorted list of needed factor sources.
 	private let factorsOfKind: OrderedDictionary<FactorSourceKind, IdentifiedArrayOf<FactorSource>>
 	
 	public init(

@@ -98,6 +98,10 @@ public enum FactorSourceKind: Int, Comparable {
 public struct FactorInstance: Hashable {
 	let factorSourceID: FactorSourceID
 }
+public struct OwnedFactorInstance: Hashable {
+	let factorInstance: FactorInstance
+	let owner: Entity.Address
+}
 public struct FactorSource: Hashable, Identifiable, Comparable {
 	public typealias ID = FactorSourceID
 	public let id: FactorSourceID
@@ -160,7 +164,7 @@ protocol BaseSigningProcess {
 	mutating func addSignature(_ signature: SignatureOfFactor)
 }
 protocol SigningProcess: BaseSigningProcess {
-	func factorInstanceOfFactorSource(id: FactorSourceID) -> FactorInstance
+	func ownedFactorInstanceOfFactorSource(id: FactorSourceID) -> OwnedFactorInstance
 }
 
 
@@ -175,11 +179,11 @@ class Context: BaseSigningProcess {
 		public let address: Entity.Address
 		public let securifiedEntityControl: SecurifiedEntityControl
 		
-		func factorInstanceOfFactorSource(id: FactorSourceID) -> FactorInstance {
+		func ownedFactorInstanceOfFactorSource(id: FactorSourceID) -> OwnedFactorInstance {
 			if let instance = securifiedEntityControl.overrideFactors.first(where: { $0.factorSourceID == id }) {
-				return instance
+				return OwnedFactorInstance(factorInstance: instance, owner: address)
 			} else if let instance = securifiedEntityControl.thresholdFactors.first(where: { $0.factorSourceID == id }) {
-				return instance
+				return OwnedFactorInstance(factorInstance: instance, owner: address)
 			} else {
 				fatalError("failed to find instance created by factor source with id: \(id), but we beleived it to be present. The map `ownersOfFactor` in `Context` is incorrectly setup.")
 			}
@@ -285,10 +289,10 @@ class Context: BaseSigningProcess {
 			case let .unsecurified(u): u.canSkipFactorSource(id: id)
 			}
 		}
-		func factorInstanceOfFactorSource(id: FactorSourceID) -> FactorInstance {
+		func ownedFactorInstanceOfFactorSource(id: FactorSourceID) -> OwnedFactorInstance {
 			switch self {
-			case let .securified(s): s.factorInstanceOfFactorSource(id: id)
-			case let .unsecurified(u): u.factorInstanceOfFactorSource(id: id)
+			case let .securified(s): s.ownedFactorInstanceOfFactorSource(id: id)
+			case let .unsecurified(u): u.ownedFactorInstanceOfFactorSource(id: id)
 			}
 		}
 		
@@ -343,11 +347,11 @@ class Context: BaseSigningProcess {
 			var id: ID { address }
 			let unsecuredControl: UnsecurifiedEntityControl
 			
-			func factorInstanceOfFactorSource(id: FactorSourceID) -> FactorInstance {
+			func ownedFactorInstanceOfFactorSource(id: FactorSourceID) -> OwnedFactorInstance {
 				guard unsecuredControl.factor.factorSourceID == id else {
 					fatalError("expected unsecuredControl.factor.factorSourceID == id but it was not. The map `ownersOfFactor` in `Context` is incorrectly setup.")
 				}
-				return unsecuredControl.factor
+				return OwnedFactorInstance(factorInstance: unsecuredControl.factor, owner: address)
 			}
 			
 			var signatureOfFactor: SignatureOfFactor?
@@ -382,11 +386,11 @@ class Context: BaseSigningProcess {
 	}
 	func signWithFactorSource(_ factorSource: FactorSource) {
 		let owners = self.ownersOfFactor[factorSource.id]!
-		let factorInstances = owners.flatMap { owner in
-			let signaturesOfEntity = self.signaturesOfEntities[id: owner]
-			return signaturesOfEntity?.factorInstanceOfFactorSource(id: factorSource.id)
+		let ownedFactorInstances = owners.map { owner in
+			let signaturesOfEntity = self.signaturesOfEntities[id: owner]!
+			return signaturesOfEntity.ownedFactorInstanceOfFactorSource(id: factorSource.id)
 		}
-		let signatures = factorSource.bulkSign(factorInstances: factorInstances)
+		let signatures = factorSource.bulkSign(ownedFactorInstances: ownedFactorInstances)
 		for signature in signatures {
 			signaturesOfEntities[id: signature.entityAddress]?.addSignature(signature)
 		}
@@ -394,8 +398,14 @@ class Context: BaseSigningProcess {
 }
 
 extension FactorSource {
-	func bulkSign(factorInstances: some Collection<FactorInstance>) -> OrderedSet<SignatureOfFactor> {
-		[]
+	func bulkSign(
+		ownedFactorInstances: some Collection<OwnedFactorInstance>
+	) -> OrderedSet<SignatureOfFactor> {
+		OrderedSet(
+			ownedFactorInstances.map {
+				SignatureOfFactor.init(entityAddress: $0.owner, signature: .init(), factorInstance: $0.factorInstance)
+			}
+		)
 	}
 }
 extension Context {

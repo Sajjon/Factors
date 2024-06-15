@@ -9,8 +9,8 @@ extension Comparable where Self: RawRepresentable, Self.RawValue: Comparable {
 }
 
 public struct AllFactorSourceInProfile {
-	let elements: [FactorSource]
-	public init(elements: [FactorSource]) {
+	let elements: IdentifiedArrayOf<FactorSource>
+	public init(elements: IdentifiedArrayOf<FactorSource>) {
 		self.elements = elements
 	}
 }
@@ -199,8 +199,12 @@ class Context: BaseSigningProcess {
 			
 		}
 		
-		init() {
-			fatalError()
+		init(
+			address: Entity.Address,
+			securifiedEntityControl: SecurifiedEntityControl
+		) {
+			self.address = address
+			self.securifiedEntityControl = securifiedEntityControl
 		}
 	}
 	
@@ -309,13 +313,14 @@ class Context: BaseSigningProcess {
 		}
 	}
 	
-	private var signaturesOfEntities: IdentifiedArrayOf<SignaturesOfEntity>
-	
 	var signatures: Set<SignatureByFactorOfEntity> {
 		Set(signaturesOfEntities.flatMap {
 			$0.signatures
 		})
 	}
+	
+	private var signaturesOfEntities: IdentifiedArrayOf<SignaturesOfEntity>
+	
 	
 	/// Can be plural, e.g. I'm a own account `A` and `B` and I'm signing a transaction where I spend
 	/// funds from accounts `A` **and** `B` where both `A` and `B` is controlled by factor source `X`,
@@ -328,7 +333,66 @@ class Context: BaseSigningProcess {
 		allFactorSourcesInProfile: AllFactorSourceInProfile,
 		entities: [EntityInProfile]
 	) {
-		fatalError()
+		var signaturesOfEntities = IdentifiedArrayOf<SignaturesOfEntity>()
+		var ownersOfFactor: Dictionary<FactorSourceID, Set<SignaturesOfEntity.ID>> = [:]
+		var usedFactorSources: IdentifiedArrayOf<FactorSource> = []
+		
+		for entity in entities {
+			let address = entity.address
+			switch entity.securityState {
+			case let .securified(sec):
+				let signaturesBuildingContext = SignaturesOfEntity.securified(
+					SignaturesOfSecurifiedEntity(
+						address: address,
+						securifiedEntityControl: sec
+					)
+				)
+				// SEC 1/3: Update `signaturesOfEntities`
+				signaturesOfEntities.append(signaturesBuildingContext)
+				
+				func add(factors keyPath: KeyPath<SecurifiedEntityControl, [FactorInstance]>) {
+					let factors = sec[keyPath: keyPath]
+					for factor in factors {
+						let id = factor.factorSourceID
+						// SEC 2/3: Update `ownersOfFactor`
+						do { var s = ownersOfFactor[id, default: []]; s.insert(address); ownersOfFactor[id] = s; }
+
+						// SEC 3/3: Update `usedFactorSources`
+						do {
+							let factorSource = allFactorSourcesInProfile.elements[id: id]!
+							usedFactorSources.append(factorSource)
+						}
+					}
+					
+				}
+				
+				add(factors: \.thresholdFactors)
+				add(factors: \.overrideFactors)
+				
+			case let .unsecurified(uec):
+				let id = uec.factor.factorSourceID
+				let signatureBuildingContext = SignaturesOfEntity.unsecurified(
+					SignaturesOfEntity.Unsecurified(
+						address: address,
+						unsecuredControl: uec
+					)
+				)
+				
+				// UEC 1/3: Update `signaturesOfEntities`
+				signaturesOfEntities.append(signatureBuildingContext)
+				
+				// UEC 2/3: Update `ownersOfFactor`
+				do { var s = ownersOfFactor[id, default: []]; s.insert(address); ownersOfFactor[id] = s; }
+
+				// UEC 3/3: Update `usedFactorSources`
+				let factorSource = allFactorSourcesInProfile.elements[id: id]!
+				usedFactorSources.append(factorSource)
+			
+			}
+		}
+		self.signaturesOfEntities = signaturesOfEntities
+		self.ownersOfFactor = ownersOfFactor
+		self.factorsOfKind = OrderedDictionary(grouping: usedFactorSources.sorted(), by: \.kind)
 	}
 	
 	func addSignature(_ signature: SignatureByFactorOfEntity) {

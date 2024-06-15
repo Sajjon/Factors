@@ -13,6 +13,7 @@ let package = Package(
             targets: ["Factor"]),
     ],
 	dependencies: [
+		.package(url: "https://github.com/apple/swift-testing", from: "0.10.0"),
 		.package(url: "https://github.com/apple/swift-collections", from: "1.1.1"),
 		.package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "1.0.2"),
 	],
@@ -26,6 +27,6 @@ let package = Package(
 			]),
         .testTarget(
             name: "FactorTests",
-            dependencies: ["Factor"]),
+			dependencies: ["Factor", .product(name: "Testing", package: "swift-testing")]),
     ]
 )

@@ -1,16 +1,7 @@
-import XCTest
-@testable import Factor
+import Testing
+import Factor
 
-final class FactorTests: XCTestCase {
-	
-	
-	func test_lazy_user() throws {
-//		let entities = [
-//			
-//		]
-//		let context = SigningContext(
-//			entities: <#T##[SigningContext.SigningEntity]#>,
-//			allFactorSources: <#T##[FactorSource]#>
-//		)
-    }
+@Test
+func lazy_user() throws {
+	#expect(1 == 1)
 }

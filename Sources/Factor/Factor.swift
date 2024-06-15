@@ -113,7 +113,6 @@ public struct FactorSource: Hashable, Identifiable, Comparable {
 	}
 }
 public struct FactorSourceID: Hashable {}
-public struct Signatures: Hashable {}
 
 public struct UnsecurifiedEntityControl: Hashable {
 	public let factor: FactorInstance
@@ -148,7 +147,7 @@ public struct EntityInProfile: Hashable {
 
 public struct Signature: Hashable {}
 
-public struct SignatureOfFactor: Hashable {
+public struct SignatureByFactorOfEntity: Hashable {
 	let entityAddress: Entity.Address
 	let signature: Signature
 	let factorInstance: FactorInstance
@@ -161,7 +160,8 @@ protocol BaseSigningProcess {
 	func canSkipFactorSource(id: FactorSourceID) -> Bool
 	mutating func skipFactorSource(id: FactorSourceID)
 	var isFinishedSigning: Bool { get }
-	mutating func addSignature(_ signature: SignatureOfFactor)
+	var signatures: Set<SignatureByFactorOfEntity> { get }
+	mutating func addSignature(_ signature: SignatureByFactorOfEntity)
 }
 protocol SigningProcess: BaseSigningProcess {
 	func ownedFactorInstanceOfFactorSource(id: FactorSourceID) -> OwnedFactorInstance
@@ -185,32 +185,29 @@ class Context: BaseSigningProcess {
 			} else if let instance = securifiedEntityControl.thresholdFactors.first(where: { $0.factorSourceID == id }) {
 				return OwnedFactorInstance(factorInstance: instance, owner: address)
 			} else {
-				fatalError("failed to find instance created by factor source with id: \(id), but we beleived it to be present. The map `ownersOfFactor` in `Context` is incorrectly setup.")
+				preconditionFailure("failed to find instance created by factor source with id: \(id), but we beleived it to be present. The map `ownersOfFactor` in `Context` is incorrectly setup.")
 			}
 		}
 		
-		var signatures: Set<SignatureOfFactor> = []
+		var signatures: Set<SignatureByFactorOfEntity> = []
 		
-		var signedOverrideFactors: Set<SignatureOfFactor> {
+		var signedOverrideFactors: Set<SignatureByFactorOfEntity> {
 			signatures.filter {
 				allOverrideFactorSourceIDs.contains($0.factorSourceID)
 			}
 		}
 		
-		var signedThresholdFactors: Set<SignatureOfFactor> {
+		var signedThresholdFactors: Set<SignatureByFactorOfEntity> {
 			signatures.filter {
 				allThresholdFactorSourceIDs.contains($0.factorSourceID)
 			}
 		}
 		
-		var skippedFactorInstances: Set<FactorInstance> = []
-		var skippedFactorSourceIDs: Set<FactorSourceID> {
-			Set(skippedFactorInstances.map(\.factorSourceID))
-		}
+		var skippedFactorSourceIDs: Set<FactorSourceID> = []
 		
 		func skipFactorSource(id: FactorSourceID) {
 			precondition(canSkipFactorSource(id: id))
-			fatalError("TODO")
+			self.skippedFactorSourceIDs.insert(id)
 			
 		}
 		
@@ -248,7 +245,7 @@ class Context: BaseSigningProcess {
 			isFinishedSigningThanksToOverrideFactors || isFinishedSigningThanksToThresholdFactors
 		}
 		
-		func addSignature(_ signature: SignatureOfFactor) {
+		func addSignature(_ signature: SignatureByFactorOfEntity) {
 			signatures.insert(signature)
 		}
 		
@@ -272,7 +269,7 @@ class Context: BaseSigningProcess {
 				let canSkipFactorSource = skippedThresholdFactors.count < maxSkippableThresholdFactorSourceCount
 				return canSkipFactorSource
 			} else {
-				fatalError("MUST be in either overrideFactors OR in thresholdFactors (and was not in overrideFactors...)")
+				preconditionFailure("MUST be in either overrideFactors OR in thresholdFactors (and was not in overrideFactors...)")
 			}
 			
 		}
@@ -283,6 +280,7 @@ class Context: BaseSigningProcess {
 	}
 	
 	enum SignaturesOfEntity: SigningProcess, Identifiable {
+		
 		func canSkipFactorSource(id: FactorSourceID) -> Bool {
 			switch self {
 			case let .securified(s): s.canSkipFactorSource(id: id)
@@ -314,7 +312,15 @@ class Context: BaseSigningProcess {
 			}
 		}
 		
-		mutating func addSignature(_ signature: SignatureOfFactor) {
+		var signatures: Set<SignatureByFactorOfEntity> {
+			switch self {
+			case let .securified(s): s.signatures
+			case let .unsecurified(u): u.signatures
+			}
+		}
+		
+		
+		mutating func addSignature(_ signature: SignatureByFactorOfEntity) {
 			switch self {
 			case let .securified(s):
 				s.addSignature(signature)
@@ -326,36 +332,45 @@ class Context: BaseSigningProcess {
 		}
 		
 		class Unsecurified: SigningProcess, Identifiable {
+			let address: Entity.Address
+			var signatures: Set<SignatureByFactorOfEntity> {
+				guard let signatureOfFactor else { return [] }
+				return [signatureOfFactor]
+			}
+			let unsecuredControl: UnsecurifiedEntityControl
+			init(address: Entity.Address, unsecuredControl: UnsecurifiedEntityControl) {
+				self.address = address
+				self.unsecuredControl = unsecuredControl
+			}
 			func canSkipFactorSource(id: FactorSourceID) -> Bool {
 				false
 			}
 			
 			func skipFactorSource(id: FactorSourceID) {
-				fatalError("not supported")
+				preconditionFailure("not supported")
 			}
 			
 			var isFinishedSigning: Bool {
 				signatureOfFactor != nil
 			}
 			
-			func addSignature(_ signature: SignatureOfFactor) {
+			func addSignature(_ signature: SignatureByFactorOfEntity) {
 				self.signatureOfFactor = signature
 			}
 			
 			typealias ID = Entity.Address
-			let address: Entity.Address
+		
 			var id: ID { address }
-			let unsecuredControl: UnsecurifiedEntityControl
 			
 			func ownedFactorInstanceOfFactorSource(id: FactorSourceID) -> OwnedFactorInstance {
 				guard unsecuredControl.factor.factorSourceID == id else {
-					fatalError("expected unsecuredControl.factor.factorSourceID == id but it was not. The map `ownersOfFactor` in `Context` is incorrectly setup.")
+					preconditionFailure("expected unsecuredControl.factor.factorSourceID == id but it was not. The map `ownersOfFactor` in `Context` is incorrectly setup.")
 				}
 				return OwnedFactorInstance(factorInstance: unsecuredControl.factor, owner: address)
 			}
 			
-			var signatureOfFactor: SignatureOfFactor?
-			init() { fatalError() }
+			var signatureOfFactor: SignatureByFactorOfEntity?
+		
 		}
 		typealias ID = Entity.Address
 		case unsecurified(Unsecurified)
@@ -369,7 +384,13 @@ class Context: BaseSigningProcess {
 		}
 	}
 	
-	var signaturesOfEntities: IdentifiedArrayOf<SignaturesOfEntity>
+	private var signaturesOfEntities: IdentifiedArrayOf<SignaturesOfEntity>
+	
+	var signatures: Set<SignatureByFactorOfEntity> {
+		Set(signaturesOfEntities.flatMap {
+			$0.signatures
+		})
+	}
 	
 	/// Can be plural, e.g. I'm a own account `A` and `B` and I'm signing a transaction where I spend
 	/// funds from accounts `A` **and** `B` where both `A` and `B` is controlled by factor source `X`,
@@ -384,6 +405,11 @@ class Context: BaseSigningProcess {
 	) {
 		fatalError()
 	}
+	
+	func addSignature(_ signature: SignatureByFactorOfEntity) {
+		signaturesOfEntities[id: signature.entityAddress]?.addSignature(signature)
+	}
+	
 	func signWithFactorSource(_ factorSource: FactorSource) {
 		let owners = self.ownersOfFactor[factorSource.id]!
 		let ownedFactorInstances = owners.map { owner in
@@ -392,7 +418,7 @@ class Context: BaseSigningProcess {
 		}
 		let signatures = factorSource.bulkSign(ownedFactorInstances: ownedFactorInstances)
 		for signature in signatures {
-			signaturesOfEntities[id: signature.entityAddress]?.addSignature(signature)
+			addSignature(signature)
 		}
 	}
 }
@@ -400,10 +426,14 @@ class Context: BaseSigningProcess {
 extension FactorSource {
 	func bulkSign(
 		ownedFactorInstances: some Collection<OwnedFactorInstance>
-	) -> OrderedSet<SignatureOfFactor> {
+	) -> OrderedSet<SignatureByFactorOfEntity> {
 		OrderedSet(
 			ownedFactorInstances.map {
-				SignatureOfFactor.init(entityAddress: $0.owner, signature: .init(), factorInstance: $0.factorInstance)
+				SignatureByFactorOfEntity(
+					entityAddress: $0.owner,
+					signature: .init(),
+					factorInstance: $0.factorInstance
+				)
 			}
 		)
 	}
@@ -420,19 +450,13 @@ extension Context {
 		})
 	}
 	
-	
-	
-	func addSignature(_ signature: SignatureOfFactor) {
-		fatalError()
-	}
-	
 	func skipFactorSource(id: FactorSourceID) {
 		ownersOfFactor[id]!.forEach { owner in
 			signaturesOfEntities[id: owner]!.skipFactorSource(id: id)
 		}
 	}
 	
-	func signTransaction() -> Signatures {
+	func signTransaction() -> Set<SignatureByFactorOfEntity> {
 		for (kind, factorSourcesOfKind) in self.factorsOfKind {
 			
 			for factorSource in factorSourcesOfKind {
@@ -447,7 +471,8 @@ extension Context {
 				signWithFactorSource(factorSource)
 			}
 		}
-		fatalError()
+		
+		return self.signatures
 	}
 }
 

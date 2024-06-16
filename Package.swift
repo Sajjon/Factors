@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "Factor",
-	platforms: [.macOS(.v10_15), .iOS(.v16)],
+	platforms: [.macOS(.v12), .iOS(.v16)],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(

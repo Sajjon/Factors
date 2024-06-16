@@ -61,7 +61,7 @@ extension SignaturesOfSecurifiedEntity {
 	}
 	
 	private var maxSkippableThresholdFactorSourceCount: Int {
-		let maxSkippableThresholdFactorSourceCount = securifiedEntityControl.threshold - securifiedEntityControl.thresholdFactors.count
+		let maxSkippableThresholdFactorSourceCount =  securifiedEntityControl.thresholdFactors.count - securifiedEntityControl.threshold
 		
 		assert(maxSkippableThresholdFactorSourceCount >= 0)
 		return maxSkippableThresholdFactorSourceCount

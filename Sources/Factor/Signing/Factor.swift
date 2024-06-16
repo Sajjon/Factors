@@ -17,7 +17,7 @@ public class Context: BaseSigningProcess {
 	
 	public init(
 		allFactorSourcesInProfile: AllFactorSourceInProfile,
-		entities: [EntityInProfile]
+		entities: [Entity]
 	) {
 		var signaturesOfEntities = IdentifiedArrayOf<SignaturesOfEntity>()
 		var ownersOfFactor: Dictionary<FactorSourceID, Set<SignaturesOfEntity.ID>> = [:]

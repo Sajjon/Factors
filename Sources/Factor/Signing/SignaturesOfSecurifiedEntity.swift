@@ -107,6 +107,9 @@ extension SignaturesOfSecurifiedEntity {
 	}
 	
 	public func canSkipFactorSource(id: FactorSourceID) -> Bool {
+		guard !self.skippedFactorSourceIDs.contains(id) else {
+			return false // already skipped
+		}
 		if isFinishedSigning {
 			return true
 		}

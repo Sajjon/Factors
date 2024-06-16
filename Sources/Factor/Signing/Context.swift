@@ -2,6 +2,16 @@ import Foundation
 import Collections
 import IdentifiedCollections
 
+public enum SimUser {
+	/// Skipping as many as possible
+	case lazy
+	
+	/// Never skips, signing as much as possible
+	case prudent
+	
+	case random
+}
+
 public class Context: BaseSigningProcess {
 	
 	/// Builders of signatures
@@ -15,10 +25,15 @@ public class Context: BaseSigningProcess {
 	/// Ordered and sorted list of needed factor sources.
 	private let factorsOfKind: OrderedDictionary<FactorSourceKind, IdentifiedArrayOf<FactorSource>>
 	
+	/// Only relevant for tests
+	public let user: SimUser
+	
 	public init(
+		user: SimUser,
 		allFactorSourcesInProfile: AllFactorSourceInProfile,
 		entities: [Entity]
 	) {
+		self.user = user
 		var signaturesOfEntities = IdentifiedArrayOf<SignaturesOfEntity>()
 		var ownersOfFactor: Dictionary<FactorSourceID, Set<SignaturesOfEntity.ID>> = [:]
 		var usedFactorSources: IdentifiedArrayOf<FactorSource> = []
@@ -90,13 +105,19 @@ extension Context {
 			for factorSource in factorSourcesOfKind {
 				precondition(factorSource.kind == kind)
 				
-				/// emulate lazy, unafraid user
-				while canSkipFactorSource(id: factorSource.id) {
+				let trySkip = switch user {
+				case .lazy: true
+				case .prudent: false
+				case .random: Bool.random()
+				}
+				if trySkip && canSkipFactorSource(id: factorSource.id) {
+					print("🙅🏻‍♀️ skipping: \(factorSource)")
 					skipFactorSource(id: factorSource.id)
-					continue
+				} else {
+					print("✍🏻 signing: \(factorSource)")
+					signWithFactorSource(factorSource)
 				}
 				
-				signWithFactorSource(factorSource)
 			}
 		}
 		

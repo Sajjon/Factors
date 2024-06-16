@@ -47,7 +47,7 @@ public struct FactorInstance: Hashable {
 	}
 }
 
-public struct FactorSource: Hashable, Identifiable, Comparable {
+public struct FactorSource: Hashable, Identifiable, Comparable, CustomStringConvertible {
 	public typealias ID = FactorSourceID
 	public let kind: FactorSourceKind
 	public let id: FactorSourceID
@@ -61,6 +61,16 @@ public struct FactorSource: Hashable, Identifiable, Comparable {
 		self.id = id
 		self.kind = kind
 		self.lastUsed = lastUsed
+	}
+	
+	public var description: String {
+		".\(kind)-\(id.short)"
+	}
+}
+
+extension UUID {
+	public var short: String {
+		String(uuidString.lowercased().suffix(6))
 	}
 }
 
@@ -84,6 +94,12 @@ public typealias FactorSourceID = UUID
 
 public struct UnsecurifiedEntityControl: Hashable {
 	public let factor: FactorInstance
+	public init(factor: FactorInstance) {
+		self.factor = factor
+	}
+	public init(index: UInt32, factorSourceID: FactorSourceID) {
+		self.init(factor: .init(index: index, factorSourceID: factorSourceID))
+	}
 }
 
 public struct SecurifiedEntityControl: Hashable {
@@ -113,6 +129,16 @@ public struct Entity: Hashable {
 	public typealias Address = String
 	public let address: Address
 	public let securityState: SecurityState
+	
+	/// We define `1` as threshold for unsecurified entities.
+	public var threshold: Int {
+		switch securityState {
+		case .unsecurified: 1
+		case .securified(let securifiedEntityControl):
+			securifiedEntityControl.threshold
+		}
+	}
+	
 	public init(
 		address: Address,
 		securityState: SecurityState

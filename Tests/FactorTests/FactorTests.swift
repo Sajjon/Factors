@@ -52,13 +52,21 @@ extension Entity {
 			]
 		)
 	}
+	
+	static let a1 = Self.unsecure(index: 0, address: "Alice") { index in
+		UnsecurifiedEntityControl.init(index: index, factorSourceID: .fs4)
+	}
 }
 
 @Test
 func lazy_user() throws {
+	let entities = [Entity.a0]
 	let context = Context(
+		user: .lazy,
 		allFactorSourcesInProfile: .all,
-		entities: [.a0]
+		entities: entities
 	)
-	context.signTransaction()
+	let signatures = context.signTransaction()
+	print(signatures)
+	#expect(signatures.count == entities.map(\.threshold).reduce(0, +))
 }

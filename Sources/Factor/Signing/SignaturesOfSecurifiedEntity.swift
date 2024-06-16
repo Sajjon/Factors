@@ -60,12 +60,7 @@ extension SignaturesOfSecurifiedEntity {
 		Set(securifiedEntityControl.overrideFactors.map(\.factorSourceID))
 	}
 	
-	private var maxSkippableThresholdFactorSourceCount: Int {
-		let maxSkippableThresholdFactorSourceCount =  securifiedEntityControl.thresholdFactors.count - securifiedEntityControl.threshold
-		
-		assert(maxSkippableThresholdFactorSourceCount >= 0)
-		return maxSkippableThresholdFactorSourceCount
-	}
+
 }
 
 // MARK: Private Methods
@@ -122,11 +117,12 @@ extension SignaturesOfSecurifiedEntity {
 			return canSkipFactorSource
 		} else if isThresholdFactor(id: id) {
 			
-			let skippedThresholdFactors = self.skippedFactorSourceIDs.subtracting(allThresholdFactorSourceIDs)
+			let nonSkippedThresholdFactorSourceIDs = allThresholdFactorSourceIDs.subtracting(skippedFactorSourceIDs)
 			
-			/// If we have not skipped more than max skippable threshold count yet, we can skip
-			/// this factors
-			let canSkipFactorSource = skippedThresholdFactors.count < maxSkippableThresholdFactorSourceCount
+			/// We have not skipped this (`id`) yet, if we would skip it we would at least have
+			/// `nonSkippedThresholdFactorSourceIDs == securifiedEntityControl.threshold`,
+			/// since we use `>` below.
+			let canSkipFactorSource = nonSkippedThresholdFactorSourceIDs.count > securifiedEntityControl.threshold
 			return canSkipFactorSource
 		} else {
 			preconditionFailure("MUST be in either overrideFactors OR in thresholdFactors (and was not in overrideFactors...)")

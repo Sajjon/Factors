@@ -14,6 +14,7 @@ let package = Package(
     ],
 	dependencies: [
 		.package(url: "https://github.com/apple/swift-testing", from: "0.10.0"),
+		.package(url: "https://github.com/apple/swift-algorithms", from: "1.2.0"),
 		.package(url: "https://github.com/apple/swift-collections", from: "1.1.1"),
 		.package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "1.0.2"),
 	],
@@ -23,10 +24,16 @@ let package = Package(
         .target(
 			name: "Factor", dependencies: [
 				.product(name: "Collections", package: "swift-collections"),
-				.product(name: "IdentifiedCollections", package: "swift-identified-collections")
+				.product(name: "IdentifiedCollections", package: "swift-identified-collections"),
+				.product(name: "Algorithms", package: "swift-algorithms"),
 			]),
         .testTarget(
             name: "FactorTests",
-			dependencies: ["Factor", .product(name: "Testing", package: "swift-testing")]),
+			dependencies: [
+				"Factor",
+				.product(name: "Testing", package: "swift-testing"),
+				.product(name: "Algorithms", package: "swift-algorithms"),
+			]
+		),
     ]
 )

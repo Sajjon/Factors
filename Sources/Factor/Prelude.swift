@@ -139,6 +139,14 @@ public struct Entity: Hashable {
 		}
 	}
 	
+	public var factorCount: Int {
+		switch securityState {
+		case .unsecurified: 1
+		case .securified(let securifiedEntityControl):
+			securifiedEntityControl.thresholdFactors.count + securifiedEntityControl.overrideFactors.count
+		}
+	}
+	
 	public init(
 		address: Address,
 		securityState: SecurityState

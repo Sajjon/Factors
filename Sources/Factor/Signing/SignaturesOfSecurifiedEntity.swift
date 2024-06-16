@@ -1,16 +1,17 @@
 //
-//  SignaturesOfSecurifiedEntity.swift
+//  SignaturesBuilderForSecurifiedEntity.swift
 //  
 //
 //  Created by Alexander Cyon on 2024-06-15.
 //
+import OrderedCollections
 
-public class SignaturesOfSecurifiedEntity: SigningProcess, Identifiable {
+public class SignaturesBuilderForSecurifiedEntity: SigningProcess, Identifiable {
 	private let address: Entity.Address
 	public let securifiedEntityControl: SecurifiedEntityControl
 
 	private var skippedFactorSourceIDs: Set<FactorSourceID>
-	public var signatures: Set<SignatureByFactorOfEntity>
+	public var signatures: OrderedSet<SignatureByFactorOfEntity>
 	
 	public init(
 		address: Entity.Address,
@@ -24,21 +25,21 @@ public class SignaturesOfSecurifiedEntity: SigningProcess, Identifiable {
 }
 
 // MARK: Identfiable
-extension SignaturesOfSecurifiedEntity {
+extension SignaturesBuilderForSecurifiedEntity {
 	public typealias ID = Entity.Address
 	public var id: ID { address }
 }
 
 // MARK: Computed Private
-extension SignaturesOfSecurifiedEntity {
+extension SignaturesBuilderForSecurifiedEntity {
 	
-	private var signedOverrideFactors: Set<SignatureByFactorOfEntity> {
+	private var signedOverrideFactors: OrderedSet<SignatureByFactorOfEntity> {
 		signatures.filter {
 			allOverrideFactorSourceIDs.contains($0.factorSourceID)
 		}
 	}
 	
-	private var signedThresholdFactors: Set<SignatureByFactorOfEntity> {
+	private var signedThresholdFactors: OrderedSet<SignatureByFactorOfEntity> {
 		signatures.filter {
 			allThresholdFactorSourceIDs.contains($0.factorSourceID)
 		}
@@ -64,7 +65,7 @@ extension SignaturesOfSecurifiedEntity {
 }
 
 // MARK: Private Methods
-extension SignaturesOfSecurifiedEntity {
+extension SignaturesBuilderForSecurifiedEntity {
 	
 	private func isOverrideFactor(id: FactorSourceID) -> Bool {
 		allOverrideFactorSourceIDs.contains(id)
@@ -76,7 +77,7 @@ extension SignaturesOfSecurifiedEntity {
 }
 
 // MARK: Protocol
-extension SignaturesOfSecurifiedEntity {
+extension SignaturesBuilderForSecurifiedEntity {
 	public var isFinishedSigning: Bool {
 		isFinishedSigningThanksToOverrideFactors || isFinishedSigningThanksToThresholdFactors
 	}
@@ -87,7 +88,7 @@ extension SignaturesOfSecurifiedEntity {
 		} else if let instance = securifiedEntityControl.thresholdFactors.first(where: { $0.factorSourceID == id }) {
 			return OwnedFactorInstance(factorInstance: instance, owner: address)
 		} else {
-			preconditionFailure("failed to find instance created by factor source with id: \(id), but we beleived it to be present. The map `ownersOfFactor` in `Context` is incorrectly setup.")
+			preconditionFailure("failed to find instance created by factor source with id: \(id), but we beleived it to be present. The map `ownersOfFactor` in `SigningContext` is incorrectly setup.")
 		}
 	}
 
@@ -98,7 +99,7 @@ extension SignaturesOfSecurifiedEntity {
 	}
 	
 	public func addSignature(_ signature: SignatureByFactorOfEntity) {
-		signatures.insert(signature)
+		signatures.append(signature)
 	}
 	
 	public func canSkipFactorSource(id: FactorSourceID) -> Bool {

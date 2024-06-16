@@ -11,7 +11,7 @@ extension Comparable where Self: RawRepresentable, Self.RawValue: Comparable {
 
 public struct AllFactorSourceInProfile: ExpressibleByArrayLiteral {
 	public init(arrayLiteral elements: FactorSource...) {
-		self.init(elements: .init(elements))
+		self.init(elements: .init(uniqueElements: elements))
 	}
 	let elements: IdentifiedArrayOf<FactorSource>
 	public init(elements: IdentifiedArrayOf<FactorSource>) {
@@ -19,13 +19,24 @@ public struct AllFactorSourceInProfile: ExpressibleByArrayLiteral {
 	}
 }
 
-public enum FactorSourceKind: Int, Comparable {
-	case device
-	case offDevice
-	case ledger
-	case arculus
+public enum FactorSourceKind: Int, Comparable, CaseIterable, CustomStringConvertible {
+	case ledger = 0
+	case arculus = 1
 	case yubikey
+	case offDevice
 	case questions
+	case device
+	
+	public var description: String {
+		switch self {
+		case .ledger: "ledger"
+		case .arculus: "arculus"
+		case .yubikey: "yubikey"
+		case .offDevice: "offDevice"
+		case .questions: "questions"
+		case .device: "device"
+		}
+	}
 }
 
 public struct FactorInstance: Hashable {
@@ -43,28 +54,40 @@ public struct FactorInstance: Hashable {
 	public init(index: UInt32, factorSourceID: FactorSourceID) {
 		self.index = index
 		self.factorSourceID = factorSourceID
-		self.privateKey = try! Curve25519.Signing.PrivateKey.init(rawRepresentation: withUnsafeBytes(of: index) { let d = Data($0); assert(d.count == 4); return Data([d, d, d, d].flatMap({ $0 })) } + withUnsafeBytes(of: factorSourceID.uuid) { Data($0) })
+		
+		let idBytes = withUnsafeBytes(of: factorSourceID.id.uuid) { Data($0) }
+		let indexBytes = withUnsafeBytes(of: index) {
+			let d = Data($0)
+			assert(d.count == 4)
+			return Data([d, d, d, d].flatMap({ $0 }))
+		}
+		let keyBytes = idBytes + indexBytes
+		self.privateKey = try! Curve25519.Signing.PrivateKey(rawRepresentation: keyBytes)
 	}
 }
 
 public struct FactorSource: Hashable, Identifiable, Comparable, CustomStringConvertible {
 	public typealias ID = FactorSourceID
-	public let kind: FactorSourceKind
+	public var kind: FactorSourceKind {
+		id.factorSourceKind
+	}
 	public let id: FactorSourceID
 	public let lastUsed: Date
 	
 	public static func <(lhs: Self, rhs: Self) -> Bool {
-		lhs.kind < rhs.kind && lhs.lastUsed < rhs.lastUsed
+		guard lhs.kind == rhs.kind else {
+			return lhs.kind < rhs.kind
+		}
+		return lhs.lastUsed < rhs.lastUsed
 	}
 	
-	public init(kind: FactorSourceKind, id: FactorSourceID = .init(), lastUsed: Date = .now) {
-		self.id = id
-		self.kind = kind
+	public init(kind: FactorSourceKind, lastUsed: Date = .now) {
+		self.id = .init(kind: kind)
 		self.lastUsed = lastUsed
 	}
 	
 	public var description: String {
-		".\(kind)-\(id.short)"
+		".\(kind)-\(id.id.short)"
 	}
 }
 
@@ -90,7 +113,14 @@ extension FactorSource {
 	}
 }
 
-public typealias FactorSourceID = UUID
+public struct FactorSourceID: Hashable {
+	public let factorSourceKind: FactorSourceKind
+	public let id: UUID
+	public init(kind: FactorSourceKind, id: UUID = .init()) {
+		self.factorSourceKind = kind
+		self.id = id
+	}
+}
 
 public struct UnsecurifiedEntityControl: Hashable {
 	public let factor: FactorInstance
@@ -113,6 +143,7 @@ public struct SecurifiedEntityControl: Hashable {
 		overrideFactors: [FactorInstance]
 	) {
 		precondition(thresholdFactors.count >= threshold)
+		precondition(Set(thresholdFactors).intersection(Set(overrideFactors)).isEmpty)
 		self.thresholdFactors = thresholdFactors
 		self.threshold = threshold
 		self.overrideFactors = overrideFactors

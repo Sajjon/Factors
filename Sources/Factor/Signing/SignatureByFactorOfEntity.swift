@@ -6,11 +6,14 @@
 //
 
 public struct SignatureByFactorOfEntity: Hashable, CustomStringConvertible {
-	let entityAddress: Entity.Address
-	let signature: Signature
-	let factorInstance: FactorInstance
-	var factorSourceID: FactorSourceID {
+	public let entityAddress: Entity.Address
+	public let signature: Signature
+	public let factorInstance: FactorInstance
+	public var factorSourceID: FactorSourceID {
 		factorInstance.factorSourceID
+	}
+	public var kind: FactorSourceKind {
+		factorSourceID.factorSourceKind
 	}
 	public var description: String {
 		"SIG-\(entityAddress)-\(factorInstance.index)-\(factorSourceID)"

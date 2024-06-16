@@ -1,17 +1,18 @@
 //
-//  SignaturesOfEntity.swift
+//  SignaturesBuilderOfEntity.swift
 //  
 //
 //  Created by Alexander Cyon on 2024-06-15.
 //
 
+import OrderedCollections
 
-public enum SignaturesOfEntity: SigningProcess, Identifiable {
-	case unsecurified(Unsecurified)
-	case securified(SignaturesOfSecurifiedEntity)
+public enum SignaturesBuilderOfEntity: SigningProcess, Identifiable {
+	case unsecurified(SignatureBuilderForUnsecurifiedEntity)
+	case securified(SignaturesBuilderForSecurifiedEntity)
 }
 
-extension SignaturesOfEntity {
+extension SignaturesBuilderOfEntity {
 	public typealias ID = Entity.Address
 
 	public var id: ID {
@@ -23,7 +24,7 @@ extension SignaturesOfEntity {
 }
 
 // MARK: Protocol
-extension SignaturesOfEntity {
+extension SignaturesBuilderOfEntity {
 	public func canSkipFactorSource(id: FactorSourceID) -> Bool {
 		switch self {
 		case let .securified(s): s.canSkipFactorSource(id: id)
@@ -56,7 +57,7 @@ extension SignaturesOfEntity {
 		}
 	}
 	
-	public var signatures: Set<SignatureByFactorOfEntity> {
+	public var signatures: OrderedSet<SignatureByFactorOfEntity> {
 		switch self {
 		case let .securified(s): s.signatures
 		case let .unsecurified(u): u.signatures

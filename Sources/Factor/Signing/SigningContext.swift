@@ -12,15 +12,15 @@ public enum SimUser {
 	case random
 }
 
-public class Context: BaseSigningProcess {
+public class SigningContext: BaseSigningProcess {
 	
 	/// Builders of signatures
-	private var signaturesOfEntities: IdentifiedArrayOf<SignaturesOfEntity>
+	public private(set) var signaturesOfEntities: IdentifiedArrayOf<SignaturesBuilderOfEntity>
 	
 	/// Can be plural, e.g. if Alice owns account `A` and `B` and Alice signs a transaction where she spend
 	/// funds from accounts `A` **and** `B` where both `A` and `B` is controlled by factor source `X`,
 	/// then this dictionary will have the entry `[X: [A, B]]`.
-	private let ownersOfFactor: Dictionary<FactorSourceID, Set<SignaturesOfEntity.ID>>
+	private let ownersOfFactor: Dictionary<FactorSourceID, Set<SignaturesBuilderOfEntity.ID>>
 	
 	/// Ordered and sorted list of needed factor sources.
 	private let factorsOfKind: OrderedDictionary<FactorSourceKind, IdentifiedArrayOf<FactorSource>>
@@ -34,16 +34,16 @@ public class Context: BaseSigningProcess {
 		entities: [Entity]
 	) {
 		self.user = user
-		var signaturesOfEntities = IdentifiedArrayOf<SignaturesOfEntity>()
-		var ownersOfFactor: Dictionary<FactorSourceID, Set<SignaturesOfEntity.ID>> = [:]
+		var signaturesOfEntities = IdentifiedArrayOf<SignaturesBuilderOfEntity>()
+		var ownersOfFactor: Dictionary<FactorSourceID, Set<SignaturesBuilderOfEntity.ID>> = [:]
 		var usedFactorSources: IdentifiedArrayOf<FactorSource> = []
 		
 		for entity in entities {
 			let address = entity.address
 			switch entity.securityState {
 			case let .securified(sec):
-				let signaturesBuildingContext = SignaturesOfEntity.securified(
-					SignaturesOfSecurifiedEntity(
+				let signaturesBuildingContext = SignaturesBuilderOfEntity.securified(
+					SignaturesBuilderForSecurifiedEntity(
 						address: address,
 						securifiedEntityControl: sec
 					)
@@ -72,8 +72,8 @@ public class Context: BaseSigningProcess {
 				
 			case let .unsecurified(uec):
 				let id = uec.factor.factorSourceID
-				let signatureBuildingContext = SignaturesOfEntity.unsecurified(
-					Unsecurified(
+				let signatureBuildingContext = SignaturesBuilderOfEntity.unsecurified(
+					SignatureBuilderForUnsecurifiedEntity(
 						address: address,
 						unsecuredControl: uec
 					)
@@ -93,13 +93,15 @@ public class Context: BaseSigningProcess {
 		}
 		self.signaturesOfEntities = signaturesOfEntities
 		self.ownersOfFactor = ownersOfFactor
-		self.factorsOfKind = OrderedDictionary(grouping: usedFactorSources.sorted(), by: \.kind)
+		
+		self.factorsOfKind = OrderedDictionary(grouping: usedFactorSources.sorted(by: <), by: \.kind)
+		
 	}
 }
 
 // MARK: Public
-extension Context {
-	public func signTransaction() -> Set<SignatureByFactorOfEntity> {
+extension SigningContext {
+	public func signTransaction() -> OrderedSet<SignatureByFactorOfEntity> {
 		for (kind, factorSourcesOfKind) in self.factorsOfKind {
 			
 			for factorSource in factorSourcesOfKind {
@@ -111,10 +113,8 @@ extension Context {
 				case .random: Bool.random()
 				}
 				if trySkip && canSkipFactorSource(id: factorSource.id) {
-					print("🙅🏻‍♀️ skipping: \(factorSource)")
 					skipFactorSource(id: factorSource.id)
 				} else {
-					print("✍🏻 signing: \(factorSource)")
 					signWithFactorSource(factorSource)
 				}
 				
@@ -126,10 +126,10 @@ extension Context {
 }
 
 // MARK: Protocol
-extension Context {
+extension SigningContext {
 	
-	public var signatures: Set<SignatureByFactorOfEntity> {
-		Set(signaturesOfEntities.flatMap {
+	public var signatures: OrderedSet<SignatureByFactorOfEntity> {
+		OrderedSet(signaturesOfEntities.flatMap {
 			$0.signatures
 		})
 	}
@@ -158,7 +158,7 @@ extension Context {
 }
 
 // MARK: Private
-extension Context {
+extension SigningContext {
 
 	private func signWithFactorSource(_ factorSource: FactorSource) {
 		let owners = self.ownersOfFactor[factorSource.id]!

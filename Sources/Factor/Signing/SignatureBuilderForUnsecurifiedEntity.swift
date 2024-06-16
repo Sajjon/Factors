@@ -4,8 +4,9 @@
 //
 //  Created by Alexander Cyon on 2024-06-15.
 //
+import OrderedCollections
 
-public final class Unsecurified: SigningProcess, Identifiable {
+public final class SignatureBuilderForUnsecurifiedEntity: SigningProcess, Identifiable {
 	public let address: Entity.Address
 	public let unsecuredControl: UnsecurifiedEntityControl
 	public var signatureOfFactor: SignatureByFactorOfEntity?
@@ -20,18 +21,18 @@ public final class Unsecurified: SigningProcess, Identifiable {
 }
 
 // MARK: Identifiable
-extension Unsecurified {
+extension SignatureBuilderForUnsecurifiedEntity {
 	public typealias ID = Entity.Address
 	public var id: ID { address }
 }
 
 // MARK: Protocol
-extension Unsecurified {
+extension SignatureBuilderForUnsecurifiedEntity {
 	public var isFinishedSigning: Bool {
 		signatureOfFactor != nil
 	}
 	
-	public var signatures: Set<SignatureByFactorOfEntity> {
+	public var signatures: OrderedSet<SignatureByFactorOfEntity> {
 		guard let signatureOfFactor else { return [] }
 		return [signatureOfFactor]
 	}
@@ -53,7 +54,7 @@ extension Unsecurified {
 	) -> OwnedFactorInstance {
 		
 		guard unsecuredControl.factor.factorSourceID == id else {
-			preconditionFailure("expected unsecuredControl.factor.factorSourceID == id but it was not. The map `ownersOfFactor` in `Context` is incorrectly setup.")
+			preconditionFailure("expected unsecuredControl.factor.factorSourceID == id but it was not. The map `ownersOfFactor` in `SigningContext` is incorrectly setup.")
 		}
 		
 		return OwnedFactorInstance(factorInstance: unsecuredControl.factor, owner: address)
